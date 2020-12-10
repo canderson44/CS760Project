@@ -1,0 +1,5 @@
+"0","#case B"
+"0","#we have three folds of data. Let's make a vector to hold the ExtraTree object for each fold"
+"0","caseB_model1<- extraTrees(caseB_trainX_fold1, caseB_trainY_fold1)"
+"0","caseB_model2<- extraTrees(caseB_trainX_fold2,caseB_trainY_fold2)"
+"0","caseB_model3<- extraTrees(caseB_trainX_fold3,caseB_trainY_fold3)"

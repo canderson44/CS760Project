@@ -1,0 +1,25 @@
+{
+    "id": "307FC33B",
+    "path": null,
+    "project_path": null,
+    "type": "object_explorer",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1607293696170.0,
+    "source_on_save": false,
+    "relative_order": 5,
+    "properties": {
+        "id": "8bf37ffa7c394a4f8ff07097e0e2f8fa",
+        "name": "numeric_x",
+        "title": "numeric_x"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 140678844471808,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1607293696170,
+    "read_only": false,
+    "read_only_alternatives": []
+}

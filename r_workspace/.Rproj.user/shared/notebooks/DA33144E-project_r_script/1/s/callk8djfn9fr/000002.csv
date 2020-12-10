@@ -1,0 +1,3 @@
+"0","caseB_m1_precision = caseB_combined_confusion_m1[1,1] / (caseB_combined_confusion_m1[1,1]+caseB_combined_confusion_m1[1,2])"
+"0","caseB_m1_recall = caseB_combined_confusion_m1[1,1] / (caseB_combined_confusion_m1[1,1]+caseB_combined_confusion_m1[2,1])"
+"0","caseB_m1_f1meas = 2 * caseB_m1_precision * caseB_m1_recall / (caseB_m1_precision + caseB_m1_recall)"

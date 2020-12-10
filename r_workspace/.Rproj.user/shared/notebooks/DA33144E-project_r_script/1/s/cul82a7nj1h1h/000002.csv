@@ -1,0 +1,7 @@
+"0","caseB_m1_eth1_precision = caseB_m1_eth1_combined_confusion[1,1] / (caseB_m1_eth1_combined_confusion[1,1]+caseB_m1_eth1_combined_confusion[1,2])"
+"0","caseB_m1_eth1_recall = caseB_m1_eth1_combined_confusion[1,1] / (caseB_m1_eth1_combined_confusion[1,1]+caseB_m1_eth1_combined_confusion[2,1])"
+"0","caseB_m1_eth1_f1meas = 2 * caseB_m1_eth1_precision * caseB_m1_eth1_recall / (caseB_m1_eth1_precision + caseB_m1_eth1_recall)"
+"0",""
+"0","caseB_m1_eth2_precision = caseB_m1_eth2_combined_confusion[1,1] / (caseB_m1_eth2_combined_confusion[1,1]+caseB_m1_eth2_combined_confusion[1,2])"
+"0","caseB_m1_eth2_recall = caseB_m1_eth2_combined_confusion[1,1] / (caseB_m1_eth2_combined_confusion[1,1]+caseB_m1_eth2_combined_confusion[2,1])"
+"0","caseB_m1_eth2_f1meas = 2 * caseB_m1_eth2_precision * caseB_m1_eth2_recall / (caseB_m1_eth2_precision + caseB_m1_eth2_recall)"

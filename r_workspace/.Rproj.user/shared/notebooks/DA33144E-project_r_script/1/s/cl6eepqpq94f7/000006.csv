@@ -1,0 +1,7 @@
+"0","row_labels <- c(""CaseA_M1"", ""CaseA_M2"", ""CaseB_M1"", ""CaseB_M2"")"
+"0","precision<- c(caseA_m1_precision, caseA_m2_precision, caseB_m1_precision, caseB_m2_precision)"
+"0","recall <- c(caseA_m1_recall, caseA_m2_recall, caseB_m1_recall, caseB_m2_recall)"
+"0","F1_meas <- c(caseA_m1_f1meas, caseA_m2_f1meas, caseB_m1_f1meas, caseB_m2_f1meas)"
+"0","stats_table <- data.frame(precision,recall,F1_meas)"
+"0","rownames(stats_table) = row_labels"
+"0","write.table(stats_table, file=""./Data/Output_Figures/summaryStatistics.csv"", sep="","", row.names=row_labels, col.names=c(""Precision"", ""Recall"", ""F1-measure""))"

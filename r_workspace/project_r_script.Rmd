@@ -1,0 +1,620 @@
+---
+title: "CS760 Semester Project"
+output: html_notebook
+author: "Catherine Anderson"
+editor_options: 
+  chunk_output_type: inline
+  
+---
+
+```{r, setup} 
+#setup code
+knitr::opts_knit$set(root.dir = normalizePath("~/Documents/CS760/Project/"))
+set.seed(3456)
+```
+
+First, let's load the necessary libraries, load the raw data, and select the desired predictors (plus the label)
+```{r}
+#load the machine learning package 
+####uncomment line beolow to load caret package
+#install.packages('caret')
+library(caret)
+library(tidyverse)
+###########################
+
+#load the raw data (best to use full filepath)
+raw_table <- read.csv('~/Documents/CS760/Project//Data/Raw/3-Year_Recidivism_for_Offenders_Released_from_Prison_in_Iowa.csv')
+
+
+data_raw <- raw_table %>% select(Fiscal.Year.Released, Main.Supervising.District, Release.Type, Race...Ethnicity, Age.At.Release, Sex, Offense.Classification, Offense.Type, Offense.Subtype, Return.to.Prison)
+```
+
+Note that the "Main.Supervising.District" feature doesn't have a value for every sample. However, because it is the only feature that explicitly provides geographical information for the samples, I'm going to try to keep it in the predictors set if possible. 
+
+
+Now, let's convert the data such that each feature takes numeric values. Also, separate the predictors and labels into separate data tables
+```{r}
+#first, convert the label Return.To.Prison
+num_samples <- nrow(data_raw)
+numeric_data <- data_raw
+
+for (i in 1:num_samples){
+  if (identical(data_raw$Return.to.Prison[i],"Yes")){
+    numeric_data$Return.to.Prison[i] <- 1
+  }else{
+      numeric_data$Return.to.Prison[i] <- 0
+  }
+}
+```
+Ok! Now we're ready to curate this data into the two cases
+Case A: 80% ethnicity #1, 20% ethnicity #2
+Case B: 50% ethnicity #1, 50% ethnicity #2
+Assign ethnicity #1 as the most frequent "Race...Ethnicity" feature value in numeric_data
+Assign ethnicity #2 as the most frequent "Race...Ethnicity" feature value in numeric_data
+
+```{r}
+ethnicity_frequencies <- data.frame(table(numeric_data$Race...Ethnicity))
+ethnicity_frequencies
+```
+Therefore we assign ethnicity #1 as "White - Non-Hispanic" and ethnicity #2 as "Black - Non-Hispanic" . Let's filter out all samples that don't match these ethnicities
+```{r}
+#filter out all samples that aren't ethnicity #1 or #2
+numeric_data_keep <- numeric_data %>% filter(Race...Ethnicity == "White - Non-Hispanic"| Race...Ethnicity== "Black - Non-Hispanic")
+
+
+data.frame(table(numeric_data_keep$Race...Ethnicity))
+```
+now let's create case A and case B full datasets (before splitting for cross-validation/training-testing)
+Each dataset will be of size 3054 because that is the maximum number of samples we can have and still have 50% (for case B) be ethnicity 2 
+
+```{r}
+dataset_size = 3054
+all_eth1 <- numeric_data_keep %>% filter(Race...Ethnicity == "Black - Non-Hispanic")
+all_eth2 <- numeric_data_keep %>% filter(Race...Ethnicity == "White - Non-Hispanic")
+
+#case A
+caseA_num_eth1 <- dataset_size*0.8
+#caseA_num_eth1
+caseA_num_eth2 <- dataset_size * 0.2
+#caseA_num_eth2
+
+caseA_eth1_indices <- sample(1:dim(all_eth1)[1], caseA_num_eth1)
+
+caseA_eth2_indices <- sample(1:dim(all_eth2)[1], caseA_num_eth2)
+
+caseA_fullData <-rbind(all_eth1[caseA_eth1_indices,], all_eth2[caseA_eth2_indices,])
+#View(caseA_fullData)
+#case B
+caseB_num_eth1 <- dataset_size*0.5
+caseB_num_eth2 <- dataset_size * 0.5
+
+caseB_eth1_indices <- sample(1:dim(all_eth1)[1], caseB_num_eth1)
+length(caseB_eth1_indices)
+caseB_eth2_indices <- sample(1:dim(all_eth2)[1], caseB_num_eth2)
+caseB_fullData <- rbind(all_eth1[caseB_eth1_indices,], all_eth2[caseB_eth2_indices,])
+#View(caseB_fullData)
+
+
+data.frame(table(caseA_fullData$Race...Ethnicity))
+data.frame(table(caseB_fullData$Race...Ethnicity))
+
+```
+Ok! Now we have the data split into the two cases with the desired "Race...Ethnicity" distributions. Time to make the data numeric.
+```{r}
+numericA_y <- as.numeric(caseA_fullData$Return.to.Prison)
+numericA_x_dummies <- dummyVars(Return.to.Prison ~ ., data = caseA_fullData)
+numericA_x <- predict(numericA_x_dummies, newdata = caseA_fullData)
+
+numericB_y <- as.numeric(caseB_fullData$Return.to.Prison)
+numericB_x_dummies <- dummyVars(Return.to.Prison ~ ., data = caseB_fullData)
+numericB_x <- predict(numericB_x_dummies, newdata = caseB_fullData)
+dim(numericA_x)
+dim(numericB_x)
+```
+case A has 3053 samples and 71 features. Case B has 3054 samples and still 75 features. The increase in features is because of the way in which the data is converted from strings to numerics. 
+
+Now let's divide the data so we can do 3-fold cross-validation
+```{r}
+numFolds <- 3
+#caseA_folds$Foldi returns the indices for all those samples selected for fold i
+caseA_folds <- createFolds(numericA_y, k = numFolds , list = TRUE, returnTrain = FALSE)
+caseA_trainX_fold1 <- numericA_x[caseA_folds$Fold1,]
+caseA_trainX_fold2 <- numericA_x[caseA_folds$Fold2,]
+caseA_trainX_fold3 <- numericA_x[caseA_folds$Fold3,]
+
+caseA_trainY_fold1<-numericA_y[caseA_folds$Fold1]
+caseA_trainY_fold2<-numericA_y[caseA_folds$Fold2]
+caseA_trainY_fold3<-numericA_y[caseA_folds$Fold3]
+
+caseA_testX_fold1<-numericA_x[-caseA_folds$Fold1,]
+caseA_testX_fold2<-numericA_x[-caseA_folds$Fold2,]
+caseA_testX_fold3<-numericA_x[-caseA_folds$Fold3,]
+
+caseA_testY_fold1<-numericA_y[-caseA_folds$Fold1]
+caseA_testY_fold2<-numericA_y[-caseA_folds$Fold2]
+caseA_testY_fold3<-numericA_y[-caseA_folds$Fold3]
+
+
+#caseB: same approach as caseA
+caseB_folds <- createFolds(numericB_y, k = numFolds , list = TRUE, returnTrain = FALSE)
+
+caseB_trainX_fold1 <- numericB_x[caseB_folds$Fold1,]
+caseB_trainX_fold2 <- numericB_x[caseB_folds$Fold2,]
+caseB_trainX_fold3 <- numericB_x[caseB_folds$Fold3,]
+
+caseB_trainY_fold1<-numericB_y[caseB_folds$Fold1]
+caseB_trainY_fold2<-numericB_y[caseB_folds$Fold2]
+caseB_trainY_fold3<-numericB_y[caseB_folds$Fold3]
+
+caseB_testX_fold1<-numericB_x[-caseB_folds$Fold1,]
+caseB_testX_fold2<-numericB_x[-caseB_folds$Fold2,]
+caseB_testX_fold3<-numericB_x[-caseB_folds$Fold3,]
+
+caseB_testY_fold1<-numericB_y[-caseB_folds$Fold1]
+caseB_testY_fold2<-numericB_y[-caseB_folds$Fold2]
+caseB_testY_fold3<-numericB_y[-caseB_folds$Fold3]
+```
+
+The data is ready to be run through the two methods!
+method#1: Random Forests
+
+method#2: Relevance Vector Machine
+```{r}
+#method 1: Random forests
+##uncomment line below to install necessary packages for extraTrees
+#install.packages('extraTrees')
+#install.packages('e1071')
+##########
+library(extraTrees)
+library(e1071)
+#help(extraTrees)
+
+#method 2: L2 regression
+##uncomment line below to install necessary package
+#install.packages('ipred')
+#install.packages('earth')
+#install.packages('kernlab')
+############
+#library(earth)
+library(kernlab)
+#library(glmStepAIC)
+help('rvm')
+
+```
+
+Ok, let's start with method#1. For now, use default parameters. If time we can back up and tune. 
+
+```{r}
+#case A
+#we have three folds of data. Let's make a vector to hold the ExtraTree object for each fold
+caseA_model1<- extraTrees(caseA_trainX_fold1, caseA_trainY_fold1)
+caseA_model2<- extraTrees(caseA_trainX_fold2,caseA_trainY_fold2)
+caseA_model3<- extraTrees(caseA_trainX_fold3,caseA_trainY_fold3)
+```
+```{r}
+#case B
+#we have three folds of data. Let's make a vector to hold the ExtraTree object for each fold
+caseB_model1<- extraTrees(caseB_trainX_fold1, caseB_trainY_fold1)
+caseB_model2<- extraTrees(caseB_trainX_fold2,caseB_trainY_fold2)
+caseB_model3<- extraTrees(caseB_trainX_fold3,caseB_trainY_fold3)
+```
+
+
+```{r}
+#test
+#need to convert the continuous regression value to discrete 0 or 1 category
+caseA_prediction1_m1_continuous<- as.numeric(predict(caseA_model1, caseA_testX_fold1))
+caseA_prediction1_m1_discrete <- factor(ifelse(caseA_prediction1_m1_continuous < 0.5, 0, 1))
+
+caseA_prediction2_m1_continuous<- as.numeric(predict(caseA_model2, caseA_testX_fold2))
+caseA_prediction2_m1_discrete <- factor(ifelse(caseA_prediction2_m1_continuous < 0.5, 0, 1))
+
+caseA_prediction3_m1_continuous<- as.numeric(predict(caseA_model3, caseA_testX_fold3))
+caseA_prediction3_m1_discrete<- factor(ifelse(caseA_prediction3_m1_continuous < 0.5, 0, 1))
+
+```
+```{r}
+#test
+#need to convert the continuous regression value to discrete 0 or 1 category
+caseB_prediction1_m1_continuous<- as.numeric(predict(caseB_model1, caseB_testX_fold1))
+caseB_prediction1_m1_discrete <- factor(ifelse(caseB_prediction1_m1_continuous < 0.5, 0, 1))
+
+caseB_prediction2_m1_continuous<- as.numeric(predict(caseB_model2, caseB_testX_fold2))
+caseB_prediction2_m1_discrete <- factor(ifelse(caseB_prediction2_m1_continuous < 0.5, 0, 1))
+
+caseB_prediction3_m1_continuous<- as.numeric(predict(caseB_model3, caseB_testX_fold3))
+caseB_prediction3_m1_discrete<- factor(ifelse(caseB_prediction3_m1_continuous < 0.5, 0, 1))
+```
+
+
+
+We need a function that will collect the true positives, false positives, true negatives, and false negatives for our data (y=0 is negative, y=1 is positive) Thankfully, the caret package already has one!
+Rows are prediction, columns are reference (test Y data)
+```{r}
+caseA_confusion1_m1<-as.table(confusionMatrix(data = caseA_prediction1_m1_discrete, reference = as.factor(caseA_testY_fold1)))
+caseA_confusion2_m1<-as.table(confusionMatrix(data = caseA_prediction2_m1_discrete, reference = as.factor(caseA_testY_fold2)))
+caseA_confusion3_m1<-as.table(confusionMatrix(data = caseA_prediction3_m1_discrete, reference = as.factor(caseA_testY_fold3)))
+
+caseA_combined_confusion_m1 <- caseA_confusion1_m1 + caseA_confusion2_m1 + caseA_confusion3_m1
+#write them to file
+write.table(caseA_confusion1_m1, file="./Data/Output_Figures/caseA_m1_confusion1.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseA_confusion2_m1, file="./Data/Output_Figures/caseA_m1_confusion2.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseA_confusion3_m1, file="./Data/Output_Figures/caseA_m1_confusion3.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseA_combined_confusion_m1, file="./Data/Output_Figures/caseA_combined_m1_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+
+```
+```{r}
+caseB_confusion1_m1<-as.table(confusionMatrix(data = caseB_prediction1_m1_discrete, reference = as.factor(caseB_testY_fold1)))
+caseB_confusion2_m1<-as.table(confusionMatrix(data = caseB_prediction2_m1_discrete, reference = as.factor(caseB_testY_fold2)))
+caseB_confusion3_m1<-as.table(confusionMatrix(data = caseB_prediction3_m1_discrete, reference = as.factor(caseB_testY_fold3)))
+
+caseB_combined_confusion_m1 <- caseB_confusion1_m1 + caseB_confusion2_m1 + caseB_confusion3_m1
+#write them to file
+write.table(caseB_confusion1_m1, file="./Data/Output_Figures/caseB_m1_confusion1.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseB_confusion2_m1, file="./Data/Output_Figures/caseB_m1_confusion2.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseB_confusion3_m1, file="./Data/Output_Figures/caseB_m1_confusion3.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseB_combined_confusion_m1, file="./Data/Output_Figures/caseB_combined_m1_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+```
+
+Now we need to get the important summary statistics: precision, recall, and F-score (F_1)
+Note about the F1 score: range is 0 to 1; 1 is best, indicating perfect precision and recall. 0 is worst, indicating that precision=0 or recall=0
+
+```{r}
+caseA_m1_precision = caseA_combined_confusion_m1[1,1] / (caseA_combined_confusion_m1[1,1]+caseA_combined_confusion_m1[1,2])
+caseA_m1_recall = caseA_combined_confusion_m1[1,1] / (caseA_combined_confusion_m1[1,1]+caseA_combined_confusion_m1[2,1])
+caseA_m1_f1meas = 2 * caseA_m1_precision * caseA_m1_recall / (caseA_m1_precision + caseA_m1_recall)
+```
+```{r}
+caseB_m1_precision = caseB_combined_confusion_m1[1,1] / (caseB_combined_confusion_m1[1,1]+caseB_combined_confusion_m1[1,2])
+caseB_m1_recall = caseB_combined_confusion_m1[1,1] / (caseB_combined_confusion_m1[1,1]+caseB_combined_confusion_m1[2,1])
+caseB_m1_f1meas = 2 * caseB_m1_precision * caseB_m1_recall / (caseB_m1_precision + caseB_m1_recall)
+```
+
+Now time for method #2: rvm
+Using automatic sigma estimation (sigest) for RBF or laplace kernel 
+```{r}
+#case A
+#train
+caseA_m2_model1 <- rvm(caseA_trainX_fold1, caseA_trainY_fold1)
+caseA_m2_model2 <- rvm(caseA_trainX_fold2, caseA_trainY_fold2)
+caseA_m2_model3 <- rvm(caseA_trainX_fold3, caseA_trainY_fold3)
+```
+```{r}
+#case B
+#train
+caseB_m2_model1 <- rvm(caseB_trainX_fold1, caseB_trainY_fold1)
+caseB_m2_model2 <- rvm(caseB_trainX_fold2, caseB_trainY_fold2)
+caseB_m2_model3 <- rvm(caseB_trainX_fold3, caseB_trainY_fold3)
+```
+```{r}
+#test
+caseA_m2_prediction1_continuous <- predict(caseA_m2_model1, caseA_testX_fold1)
+caseA_m2_prediction1_discrete <- factor(ifelse(caseA_m2_prediction1_continuous < 0.5, 0, 1))
+
+caseA_m2_prediction2_continuous <- predict(caseA_m2_model2, caseA_testX_fold2)
+caseA_m2_prediction2_discrete <- factor(ifelse(caseA_m2_prediction2_continuous < 0.5, 0, 1))
+
+caseA_m2_prediction3_continuous <- predict(caseA_m2_model3, caseA_testX_fold3)
+caseA_m2_prediction3_discrete <- factor(ifelse(caseA_m2_prediction3_continuous < 0.5, 0, 1))
+```
+```{r}
+#test
+caseB_m2_prediction1_continuous <- predict(caseB_m2_model1, caseB_testX_fold1)
+caseB_m2_prediction1_discrete <- factor(ifelse(caseB_m2_prediction1_continuous < 0.5, 0, 1))
+
+caseB_m2_prediction2_continuous <- predict(caseB_m2_model2, caseB_testX_fold2)
+caseB_m2_prediction2_discrete <- factor(ifelse(caseB_m2_prediction2_continuous < 0.5, 0, 1))
+
+caseB_m2_prediction3_continuous <- predict(caseB_m2_model3, caseB_testX_fold3)
+caseB_m2_prediction3_discrete <- factor(ifelse(caseB_m2_prediction3_continuous < 0.5, 0, 1))
+```
+
+Now get the confusion matrices
+```{r}
+caseA_m2_confusion1<-as.table(confusionMatrix(data = caseA_m2_prediction1_discrete, reference = as.factor(caseA_testY_fold1)))
+caseA_m2_confusion2<-as.table(confusionMatrix(data = caseA_m2_prediction2_discrete, reference = as.factor(caseA_testY_fold2)))
+caseA_m2_confusion3<-as.table(confusionMatrix(data = caseA_m2_prediction3_discrete, reference = as.factor(caseA_testY_fold3)))
+caseA_m2_combined_confusion <- caseA_m2_confusion1 + caseA_m2_confusion2 + caseA_m2_confusion3
+
+write.table(caseA_m2_confusion1, file="./Data/Output_Figures/caseA_m2_confusion1.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseA_m2_confusion2, file="./Data/Output_Figures/caseA_m2_confusion2.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseA_m2_confusion3, file="./Data/Output_Figures/caseA_m2_confusion3.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseA_m2_combined_confusion, file="./Data/Output_Figures/caseA_combined_m2_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+
+caseB_m2_confusion1<-as.table(confusionMatrix(data = caseB_m2_prediction1_discrete, reference = as.factor(caseB_testY_fold1)))
+caseB_m2_confusion2<-as.table(confusionMatrix(data = caseB_m2_prediction2_discrete, reference = as.factor(caseB_testY_fold2)))
+caseB_m2_confusion3<-as.table(confusionMatrix(data = caseB_m2_prediction3_discrete, reference = as.factor(caseB_testY_fold3)))
+caseB_m2_combined_confusion <- caseB_m2_confusion1 + caseB_m2_confusion2 + caseB_m2_confusion3
+
+write.table(caseB_m2_confusion1, file="./Data/Output_Figures/caseB_m2_confusion1.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseB_m2_confusion2, file="./Data/Output_Figures/caseB_m2_confusion2.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseB_m2_confusion3, file="./Data/Output_Figures/caseB_m2_confusion3.csv",row.names=FALSE, col.names=FALSE, sep=",")
+write.table(caseB_m2_combined_confusion, file="./Data/Output_Figures/caseB_combined_m2_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+```
+
+Now the summary statistics
+```{r}
+caseA_m2_precision = caseA_m2_combined_confusion[1,1] / (caseA_m2_combined_confusion[1,1]+caseA_m2_combined_confusion[1,2])
+caseA_m2_recall = caseA_m2_combined_confusion[1,1] / (caseA_m2_combined_confusion[1,1]+caseA_m2_combined_confusion[2,1])
+caseA_m2_f1meas = 2 * caseA_m2_precision * caseA_m2_recall / (caseA_m2_precision + caseA_m2_recall)
+```
+```{r}
+caseB_m2_precision = caseB_m2_combined_confusion[1,1] / (caseB_m2_combined_confusion[1,1]+caseB_m2_combined_confusion[1,2])
+caseB_m2_recall = caseB_m2_combined_confusion[1,1] / (caseB_m2_combined_confusion[1,1]+caseB_m2_combined_confusion[2,1])
+caseB_m2_f1meas = 2 * caseB_m2_precision * caseB_m2_recall / (caseB_m2_precision + caseB_m2_recall)
+```
+Compile results into a table
+```{r}
+row_labels <- c("CaseA_M1", "CaseA_M2", "CaseB_M1", "CaseB_M2")
+precision<- c(caseA_m1_precision, caseA_m2_precision, caseB_m1_precision, caseB_m2_precision)
+recall <- c(caseA_m1_recall, caseA_m2_recall, caseB_m1_recall, caseB_m2_recall)
+F1_meas <- c(caseA_m1_f1meas, caseA_m2_f1meas, caseB_m1_f1meas, caseB_m2_f1meas)
+stats_table <- data.frame(precision,recall,F1_meas)
+rownames(stats_table) = row_labels
+write.table(stats_table, file="./Data/Output_Figures/summaryStatistics.csv", sep=",", row.names=row_labels, col.names=c("Precision", "Recall", "F1-measure"))
+```
+
+
+Now let's visualize the F scores! 
+```{r}
+#library(ggplot2)
+png("./Data/Output_Figures/caseA_comparison.png")
+caseA_comparison <- barplot(height=as.numeric(F1_meas[1:2]), names=row_labels[1:2],ylab="F1 Measure", ylim=c(0,1), col="brown")
+text(x = caseA_comparison, y = as.numeric(F1_meas[1:2]), label = as.numeric(F1_meas[1:2]), pos = 3, cex = 0.8, col = "black")
+#save figure
+
+dev.off()
+
+png("./Data/Output_Figures/caseB_comparison.png")
+caseB_comparison <- barplot(height=as.numeric(F1_meas[3:4]), names=row_labels[3:4],ylab="F1 Measure", ylim=c(0,1), col="#69b3a2")
+text(x = caseB_comparison, y = as.numeric(F1_meas[3:4]), label = as.numeric(F1_meas[3:4]), pos = 3, cex = 0.8, col = "black")
+dev.off()
+
+png("./Data/Output_Figures/m1_comparison.png")
+m1_comparison <-barplot(height=as.numeric(c(F1_meas[1], F1_meas[3])), names=c(row_labels[1],row_labels[3]),ylab="F1 Measure", ylim=c(0,1), col=c("#69b3a2","brown"))
+text(x = m1_comparison, y = as.numeric(c(F1_meas[1], F1_meas[3])), label = as.numeric(c(F1_meas[1], F1_meas[3])), pos = 3, cex = 0.8, col = "black")
+dev.off()
+
+png("./Data/Output_Figures/m2_comparison.png")
+m2_comparison<-barplot(height=as.numeric(c(F1_meas[2], F1_meas[4])), names=c(row_labels[2],row_labels[4]),ylab="F1 Measure", ylim=c(0,1), col=c("#69b3a2","brown"))
+text(x = m2_comparison, y = as.numeric(c(F1_meas[2], F1_meas[4])), label = as.numeric(c(F1_meas[2], F1_meas[4])), pos = 3, cex = 0.8, col = "black")
+dev.off()
+
+png("./Data/Output_Figures/all_comparison.png")
+all_comparison<-barplot(height=as.numeric(F1_meas), names=row_labels,ylab="F1 Measure", ylim=c(0,1), col=c("#69b3a2","#69b3a2","brown","brown"))
+text(x = all_comparison, y = as.numeric(F1_meas), label = as.numeric(F1_meas), pos = 3, cex = 0.8, col = "black")
+dev.off()
+```
+These evaluations have been on the entire training set as a whole. Let's see how the models perform on all ethnicity#1, and separately how it performs on all ethnicity#2
+
+```{r}
+caseA_testIndices_eth1_fold1 <- which(caseA_testX_fold1[,26] == 1)
+caseA_testIndices_eth1_fold2 <- which(caseA_testX_fold2[,26] == 1)
+caseA_testIndices_eth1_fold3 <- which(caseA_testX_fold3[,26] == 1)
+
+
+caseA_testX_eth1_fold1 <- caseA_testX_fold1[caseA_testIndices_eth1_fold1,]
+caseA_testY_eth1_fold1 <- caseA_testY_fold1[caseA_testIndices_eth1_fold1]
+caseA_testX_eth1_fold2 <- caseA_testX_fold2[caseA_testIndices_eth1_fold2,]
+caseA_testY_eth1_fold2 <- caseA_testY_fold2[caseA_testIndices_eth1_fold2]
+caseA_testX_eth1_fold3 <- caseA_testX_fold3[caseA_testIndices_eth1_fold3,]
+caseA_testY_eth1_fold3 <- caseA_testY_fold3[caseA_testIndices_eth1_fold3]
+
+caseA_m1_eth1_prediction1_continuous<- as.numeric(predict(caseA_model1, caseA_testX_eth1_fold1))
+caseA_m1_eth1_prediction1_discrete <- factor(ifelse(caseA_m1_eth1_prediction1_continuous < 0.5, 0, 1))
+caseA_m1_eth1_prediction2_continuous<- as.numeric(predict(caseA_model2, caseA_testX_eth1_fold2))
+caseA_m1_eth1_prediction2_discrete <- factor(ifelse(caseA_m1_eth1_prediction2_continuous < 0.5, 0, 1))
+caseA_m1_eth1_prediction3_continuous<- as.numeric(predict(caseA_model3, caseA_testX_eth1_fold3))
+caseA_m1_eth1_prediction3_discrete <- factor(ifelse(caseA_m1_eth1_prediction3_continuous < 0.5, 0, 1))
+
+caseA_m1_eth1_confusion1 <-as.table(confusionMatrix(data = caseA_m1_eth1_prediction1_discrete, reference = as.factor(caseA_testY_eth1_fold1)))
+caseA_m1_eth1_confusion2 <-as.table(confusionMatrix(data = caseA_m1_eth1_prediction2_discrete, reference = as.factor(caseA_testY_eth1_fold2)))
+caseA_m1_eth1_confusion3 <-as.table(confusionMatrix(data = caseA_m1_eth1_prediction3_discrete, reference = as.factor(caseA_testY_eth1_fold3)))
+caseA_m1_eth1_combined_confusion <- caseA_m1_eth1_confusion1 + caseA_m1_eth1_confusion2 + caseA_m1_eth1_confusion3
+write.table(caseA_m1_eth1_combined_confusion, file="./Data/Output_Figures/caseA_m1_eth1_combined_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+
+
+#################
+caseA_testIndices_eth2_fold1 <- which(caseA_testX_fold1[,25]==1)
+caseA_testIndices_eth2_fold2 <- which(caseA_testX_fold2[,25]==1)
+caseA_testIndices_eth2_fold3 <- which(caseA_testX_fold3[,25]==1)
+
+caseA_testX_eth2_fold1<- caseA_testX_fold1[caseA_testIndices_eth2_fold1,]
+caseA_testX_eth2_fold2<- caseA_testX_fold2[caseA_testIndices_eth2_fold2,]
+caseA_testX_eth2_fold3<- caseA_testX_fold3[caseA_testIndices_eth2_fold3,]
+
+caseA_testY_eth2_fold1 <- caseA_testY_fold1[caseA_testIndices_eth2_fold1]
+caseA_testY_eth2_fold2 <- caseA_testY_fold2[caseA_testIndices_eth2_fold2]
+caseA_testY_eth2_fold3 <- caseA_testY_fold3[caseA_testIndices_eth2_fold3]
+
+caseA_m1_eth2_prediction1_continuous<- as.numeric(predict(caseA_model1, caseA_testX_eth2_fold1))
+caseA_m1_eth2_prediction1_discrete <- factor(ifelse(caseA_m1_eth2_prediction1_continuous < 0.5, 0, 1))
+caseA_m1_eth2_prediction2_continuous<- as.numeric(predict(caseA_model2, caseA_testX_eth2_fold2))
+caseA_m1_eth2_prediction2_discrete <- factor(ifelse(caseA_m1_eth2_prediction2_continuous < 0.5, 0, 1))
+caseA_m1_eth2_prediction3_continuous<- as.numeric(predict(caseA_model3, caseA_testX_eth2_fold3))
+caseA_m1_eth2_prediction3_discrete <- factor(ifelse(caseA_m1_eth2_prediction3_continuous < 0.5, 0, 1))
+
+caseA_m1_eth2_confusion1 <-as.table(confusionMatrix(data = caseA_m1_eth2_prediction1_discrete, reference = as.factor(caseA_testY_eth2_fold1)))
+caseA_m1_eth2_confusion2 <-as.table(confusionMatrix(data = caseA_m1_eth2_prediction2_discrete, reference = as.factor(caseA_testY_eth2_fold2)))
+caseA_m1_eth2_confusion3 <-as.table(confusionMatrix(data = caseA_m1_eth2_prediction3_discrete, reference = as.factor(caseA_testY_eth2_fold3)))
+caseA_m1_eth2_combined_confusion <- caseA_m1_eth2_confusion1 + caseA_m1_eth2_confusion2 + caseA_m1_eth2_confusion3
+write.table(caseA_m1_eth2_combined_confusion, file="./Data/Output_Figures/caseA_m1_eth2_combined_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+```
+
+Now the summary statistics
+```{r}
+caseA_m1_eth1_precision = caseA_m1_eth1_combined_confusion[1,1] / (caseA_m1_eth1_combined_confusion[1,1]+caseA_m1_eth1_combined_confusion[1,2])
+caseA_m1_eth1_recall = caseA_m1_eth1_combined_confusion[1,1] / (caseA_m1_eth1_combined_confusion[1,1]+caseA_m1_eth1_combined_confusion[2,1])
+caseA_m1_eth1_f1meas = 2 * caseA_m1_eth1_precision * caseA_m1_eth1_recall / (caseA_m1_eth1_precision + caseA_m1_eth1_recall)
+
+caseA_m1_eth2_precision = caseA_m1_eth2_combined_confusion[1,1] / (caseA_m1_eth2_combined_confusion[1,1]+caseA_m1_eth2_combined_confusion[1,2])
+caseA_m1_eth2_recall = caseA_m1_eth2_combined_confusion[1,1] / (caseA_m1_eth2_combined_confusion[1,1]+caseA_m1_eth2_combined_confusion[2,1])
+caseA_m1_eth2_f1meas = 2 * caseA_m1_eth2_precision * caseA_m1_eth2_recall / (caseA_m1_eth2_precision + caseA_m1_eth2_recall)
+
+```
+
+Now do CaseB
+```{r}
+caseB_testIndices_eth1_fold1 <- which(caseB_testX_fold1[,26] == 1)
+caseB_testIndices_eth1_fold2 <- which(caseB_testX_fold2[,26] == 1)
+caseB_testIndices_eth1_fold3 <- which(caseB_testX_fold3[,26] == 1)
+
+
+caseB_testX_eth1_fold1 <- caseB_testX_fold1[caseB_testIndices_eth1_fold1,]
+caseB_testY_eth1_fold1 <- caseB_testY_fold1[caseB_testIndices_eth1_fold1]
+caseB_testX_eth1_fold2 <- caseB_testX_fold2[caseB_testIndices_eth1_fold2,]
+caseB_testY_eth1_fold2 <- caseB_testY_fold2[caseB_testIndices_eth1_fold2]
+caseB_testX_eth1_fold3 <- caseB_testX_fold3[caseB_testIndices_eth1_fold3,]
+caseB_testY_eth1_fold3 <- caseB_testY_fold3[caseB_testIndices_eth1_fold3]
+
+caseB_m1_eth1_prediction1_continuous<- as.numeric(predict(caseB_model1, caseB_testX_eth1_fold1))
+caseB_m1_eth1_prediction1_discrete <- factor(ifelse(caseB_m1_eth1_prediction1_continuous < 0.5, 0, 1))
+caseB_m1_eth1_prediction2_continuous<- as.numeric(predict(caseB_model2, caseB_testX_eth1_fold2))
+caseB_m1_eth1_prediction2_discrete <- factor(ifelse(caseB_m1_eth1_prediction2_continuous < 0.5, 0, 1))
+caseB_m1_eth1_prediction3_continuous<- as.numeric(predict(caseB_model3, caseB_testX_eth1_fold3))
+caseB_m1_eth1_prediction3_discrete <- factor(ifelse(caseB_m1_eth1_prediction3_continuous < 0.5, 0, 1))
+
+caseB_m1_eth1_confusion1 <-as.table(confusionMatrix(data = caseB_m1_eth1_prediction1_discrete, reference = as.factor(caseB_testY_eth1_fold1)))
+caseB_m1_eth1_confusion2 <-as.table(confusionMatrix(data = caseB_m1_eth1_prediction2_discrete, reference = as.factor(caseB_testY_eth1_fold2)))
+caseB_m1_eth1_confusion3 <-as.table(confusionMatrix(data = caseB_m1_eth1_prediction3_discrete, reference = as.factor(caseB_testY_eth1_fold3)))
+caseB_m1_eth1_combined_confusion <- caseB_m1_eth1_confusion1 + caseB_m1_eth1_confusion2 + caseB_m1_eth1_confusion3
+write.table(caseB_m1_eth1_combined_confusion, file="./Data/Output_Figures/caseB_m1_eth1_combined_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+
+
+#################
+caseB_testIndices_eth2_fold1 <- which(caseB_testX_fold1[,25]==1)
+caseB_testIndices_eth2_fold2 <- which(caseB_testX_fold2[,25]==1)
+caseB_testIndices_eth2_fold3 <- which(caseB_testX_fold3[,25]==1)
+
+caseB_testX_eth2_fold1<- caseB_testX_fold1[caseB_testIndices_eth2_fold1,]
+caseB_testX_eth2_fold2<- caseB_testX_fold2[caseB_testIndices_eth2_fold2,]
+caseB_testX_eth2_fold3<- caseB_testX_fold3[caseB_testIndices_eth2_fold3,]
+
+caseB_testY_eth2_fold1 <- caseB_testY_fold1[caseB_testIndices_eth2_fold1]
+caseB_testY_eth2_fold2 <- caseB_testY_fold2[caseB_testIndices_eth2_fold2]
+caseB_testY_eth2_fold3 <- caseB_testY_fold3[caseB_testIndices_eth2_fold3]
+
+caseB_m1_eth2_prediction1_continuous<- as.numeric(predict(caseB_model1, caseB_testX_eth2_fold1))
+caseB_m1_eth2_prediction1_discrete <- factor(ifelse(caseB_m1_eth2_prediction1_continuous < 0.5, 0, 1))
+caseB_m1_eth2_prediction2_continuous<- as.numeric(predict(caseB_model2, caseB_testX_eth2_fold2))
+caseB_m1_eth2_prediction2_discrete <- factor(ifelse(caseB_m1_eth2_prediction2_continuous < 0.5, 0, 1))
+caseB_m1_eth2_prediction3_continuous<- as.numeric(predict(caseB_model3, caseB_testX_eth2_fold3))
+caseB_m1_eth2_prediction3_discrete <- factor(ifelse(caseB_m1_eth2_prediction3_continuous < 0.5, 0, 1))
+
+caseB_m1_eth2_confusion1 <-as.table(confusionMatrix(data = caseB_m1_eth2_prediction1_discrete, reference = as.factor(caseB_testY_eth2_fold1)))
+caseB_m1_eth2_confusion2 <-as.table(confusionMatrix(data = caseB_m1_eth2_prediction2_discrete, reference = as.factor(caseB_testY_eth2_fold2)))
+caseB_m1_eth2_confusion3 <-as.table(confusionMatrix(data = caseB_m1_eth2_prediction3_discrete, reference = as.factor(caseB_testY_eth2_fold3)))
+caseB_m1_eth2_combined_confusion <- caseB_m1_eth2_confusion1 + caseB_m1_eth2_confusion2 + caseB_m1_eth2_confusion3
+write.table(caseB_m1_eth2_combined_confusion, file="./Data/Output_Figures/caseB_m1_eth2_combined_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+
+```
+```{r}
+caseB_m1_eth1_precision = caseB_m1_eth1_combined_confusion[1,1] / (caseB_m1_eth1_combined_confusion[1,1]+caseB_m1_eth1_combined_confusion[1,2])
+caseB_m1_eth1_recall = caseB_m1_eth1_combined_confusion[1,1] / (caseB_m1_eth1_combined_confusion[1,1]+caseB_m1_eth1_combined_confusion[2,1])
+caseB_m1_eth1_f1meas = 2 * caseB_m1_eth1_precision * caseB_m1_eth1_recall / (caseB_m1_eth1_precision + caseB_m1_eth1_recall)
+
+caseB_m1_eth2_precision = caseB_m1_eth2_combined_confusion[1,1] / (caseB_m1_eth2_combined_confusion[1,1]+caseB_m1_eth2_combined_confusion[1,2])
+caseB_m1_eth2_recall = caseB_m1_eth2_combined_confusion[1,1] / (caseB_m1_eth2_combined_confusion[1,1]+caseB_m1_eth2_combined_confusion[2,1])
+caseB_m1_eth2_f1meas = 2 * caseB_m1_eth2_precision * caseB_m1_eth2_recall / (caseB_m1_eth2_precision + caseB_m1_eth2_recall)
+```
+
+
+Now, let's do model 2
+case A
+```{r}
+
+caseA_m2_eth1_prediction1_continuous<- as.numeric(predict(caseA_m2_model1, caseA_testX_eth1_fold1))
+caseA_m2_eth1_prediction1_discrete <- factor(ifelse(caseA_m2_eth1_prediction1_continuous < 0.5, 0, 1))
+caseA_m2_eth1_prediction2_continuous<- as.numeric(predict(caseA_m2_model2, caseA_testX_eth1_fold2))
+caseA_m2_eth1_prediction2_discrete <- factor(ifelse(caseA_m2_eth1_prediction2_continuous < 0.5, 0, 1))
+caseA_m2_eth1_prediction3_continuous<- as.numeric(predict(caseA_m2_model3, caseA_testX_eth1_fold3))
+caseA_m2_eth1_prediction3_discrete <- factor(ifelse(caseA_m2_eth1_prediction3_continuous < 0.5, 0, 1))
+
+caseA_m2_eth1_confusion1 <-as.table(confusionMatrix(data = caseA_m2_eth1_prediction1_discrete, reference = as.factor(caseA_testY_eth1_fold1)))
+caseA_m2_eth1_confusion2 <-as.table(confusionMatrix(data = caseA_m2_eth1_prediction2_discrete, reference = as.factor(caseA_testY_eth1_fold2)))
+caseA_m2_eth1_confusion3 <-as.table(confusionMatrix(data = caseA_m2_eth1_prediction3_discrete, reference = as.factor(caseA_testY_eth1_fold3)))
+caseA_m2_eth1_combined_confusion <- caseA_m2_eth1_confusion1 + caseA_m2_eth1_confusion2 + caseA_m2_eth1_confusion3
+write.table(caseA_m2_eth1_combined_confusion, file="./Data/Output_Figures/caseA_m2_eth1_combined_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+
+
+#################
+
+caseA_m2_eth2_prediction1_continuous<- as.numeric(predict(caseA_m2_model1, caseA_testX_eth2_fold1))
+caseA_m2_eth2_prediction1_discrete <- factor(ifelse(caseA_m2_eth2_prediction1_continuous < 0.5, 0, 1))
+caseA_m2_eth2_prediction2_continuous<- as.numeric(predict(caseA_m2_model2, caseA_testX_eth2_fold2))
+caseA_m2_eth2_prediction2_discrete <- factor(ifelse(caseA_m2_eth2_prediction2_continuous < 0.5, 0, 1))
+caseA_m2_eth2_prediction3_continuous<- as.numeric(predict(caseA_m2_model3, caseA_testX_eth2_fold3))
+caseA_m2_eth2_prediction3_discrete <- factor(ifelse(caseA_m2_eth2_prediction3_continuous < 0.5, 0, 1))
+
+caseA_m2_eth2_confusion1 <-as.table(confusionMatrix(data = caseA_m2_eth2_prediction1_discrete, reference = as.factor(caseA_testY_eth2_fold1)))
+caseA_m2_eth2_confusion2 <-as.table(confusionMatrix(data = caseA_m2_eth2_prediction2_discrete, reference = as.factor(caseA_testY_eth2_fold2)))
+caseA_m2_eth2_confusion3 <-as.table(confusionMatrix(data = caseA_m2_eth2_prediction3_discrete, reference = as.factor(caseA_testY_eth2_fold3)))
+caseA_m2_eth2_combined_confusion <- caseA_m2_eth2_confusion1 + caseA_m2_eth2_confusion2 + caseA_m2_eth2_confusion3
+write.table(caseA_m2_eth2_combined_confusion, file="./Data/Output_Figures/caseA_m2_eth2_combined_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+```
+```{r}
+caseA_m2_eth1_precision = caseA_m2_eth1_combined_confusion[1,1] / (caseA_m2_eth1_combined_confusion[1,1]+caseA_m2_eth1_combined_confusion[1,2])
+caseA_m2_eth1_recall = caseA_m2_eth1_combined_confusion[1,1] / (caseA_m2_eth1_combined_confusion[1,1]+caseA_m2_eth1_combined_confusion[2,1])
+caseA_m2_eth1_f1meas = 2 * caseA_m2_eth1_precision * caseA_m2_eth1_recall / (caseA_m2_eth1_precision + caseA_m2_eth1_recall)
+
+caseA_m2_eth2_precision = caseA_m2_eth2_combined_confusion[1,1] / (caseA_m2_eth2_combined_confusion[1,1]+caseA_m2_eth2_combined_confusion[1,2])
+caseA_m2_eth2_recall = caseA_m2_eth2_combined_confusion[1,1] / (caseA_m2_eth2_combined_confusion[1,1]+caseA_m2_eth2_combined_confusion[2,1])
+caseA_m2_eth2_f1meas = 2 * caseA_m2_eth2_precision * caseA_m2_eth2_recall / (caseA_m2_eth2_precision + caseA_m2_eth2_recall)
+```
+
+Case B
+```{r}
+caseB_m2_eth1_prediction1_continuous<- as.numeric(predict(caseB_m2_model1, caseB_testX_eth1_fold1))
+caseB_m2_eth1_prediction1_discrete <- factor(ifelse(caseB_m2_eth1_prediction1_continuous < 0.5, 0, 1))
+caseB_m2_eth1_prediction2_continuous<- as.numeric(predict(caseB_m2_model2, caseB_testX_eth1_fold2))
+caseB_m2_eth1_prediction2_discrete <- factor(ifelse(caseB_m2_eth1_prediction2_continuous < 0.5, 0, 1))
+caseB_m2_eth1_prediction3_continuous<- as.numeric(predict(caseB_m2_model3, caseB_testX_eth1_fold3))
+caseB_m2_eth1_prediction3_discrete <- factor(ifelse(caseB_m2_eth1_prediction3_continuous < 0.5, 0, 1))
+
+caseB_m2_eth1_confusion1 <-as.table(confusionMatrix(data = caseB_m2_eth1_prediction1_discrete, reference = as.factor(caseB_testY_eth1_fold1)))
+caseB_m2_eth1_confusion2 <-as.table(confusionMatrix(data = caseB_m2_eth1_prediction2_discrete, reference = as.factor(caseB_testY_eth1_fold2)))
+caseB_m2_eth1_confusion3 <-as.table(confusionMatrix(data = caseB_m2_eth1_prediction3_discrete, reference = as.factor(caseB_testY_eth1_fold3)))
+caseB_m2_eth1_combined_confusion <- caseB_m2_eth1_confusion1 + caseB_m2_eth1_confusion2 + caseB_m2_eth1_confusion3
+write.table(caseB_m2_eth1_combined_confusion, file="./Data/Output_Figures/caseB_m2_eth1_combined_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+
+
+#################
+
+caseB_m2_eth2_prediction1_continuous<- as.numeric(predict(caseB_m2_model1, caseB_testX_eth2_fold1))
+caseB_m2_eth2_prediction1_discrete <- factor(ifelse(caseB_m2_eth2_prediction1_continuous < 0.5, 0, 1))
+caseB_m2_eth2_prediction2_continuous<- as.numeric(predict(caseB_m2_model2, caseB_testX_eth2_fold2))
+caseB_m2_eth2_prediction2_discrete <- factor(ifelse(caseB_m2_eth2_prediction2_continuous < 0.5, 0, 1))
+caseB_m2_eth2_prediction3_continuous<- as.numeric(predict(caseB_m2_model3, caseB_testX_eth2_fold3))
+caseB_m2_eth2_prediction3_discrete <- factor(ifelse(caseB_m2_eth2_prediction3_continuous < 0.5, 0, 1))
+
+caseB_m2_eth2_confusion1 <-as.table(confusionMatrix(data = caseB_m2_eth2_prediction1_discrete, reference = as.factor(caseB_testY_eth2_fold1)))
+caseB_m2_eth2_confusion2 <-as.table(confusionMatrix(data = caseB_m2_eth2_prediction2_discrete, reference = as.factor(caseB_testY_eth2_fold2)))
+caseB_m2_eth2_confusion3 <-as.table(confusionMatrix(data = caseB_m2_eth2_prediction3_discrete, reference = as.factor(caseB_testY_eth2_fold3)))
+caseB_m2_eth2_combined_confusion <- caseB_m2_eth2_confusion1 + caseB_m2_eth2_confusion2 + caseB_m2_eth2_confusion3
+write.table(caseB_m2_eth2_combined_confusion, file="./Data/Output_Figures/caseB_m2_eth2_combined_confusion.csv",row.names=FALSE, col.names=FALSE, sep=",")
+
+```
+```{r}
+caseB_m2_eth1_precision = caseB_m2_eth1_combined_confusion[1,1] / (caseB_m2_eth1_combined_confusion[1,1]+caseB_m2_eth1_combined_confusion[1,2])
+caseB_m2_eth1_recall = caseB_m2_eth1_combined_confusion[1,1] / (caseB_m2_eth1_combined_confusion[1,1]+caseB_m2_eth1_combined_confusion[2,1])
+caseB_m2_eth1_f1meas = 2 * caseB_m2_eth1_precision * caseB_m2_eth1_recall / (caseB_m2_eth1_precision + caseB_m2_eth1_recall)
+
+caseB_m2_eth2_precision = caseB_m2_eth2_combined_confusion[1,1] / (caseB_m2_eth2_combined_confusion[1,1]+caseB_m2_eth2_combined_confusion[1,2])
+caseB_m2_eth2_recall = caseB_m2_eth2_combined_confusion[1,1] / (caseB_m2_eth2_combined_confusion[1,1]+caseB_m2_eth2_combined_confusion[2,1])
+caseB_m2_eth2_f1meas = 2 * caseB_m2_eth2_precision * caseB_m2_eth2_recall / (caseB_m2_eth2_precision + caseB_m2_eth2_recall)
+```
+
+Compile results into a table
+```{r}
+ethspecific_row_labels <- c("CaseA_M1_E1", "CaseA_M1_E2", "CaseB_M1_E1", "CaseB_M1_E2","CaseA_M2_E1", "CaseA_M2_E2", "CaseB_M2_E1", "CaseB_M2_E2")
+precision_espec<- c(caseA_m1_eth1_precision, caseA_m1_eth2_precision, caseB_m1_eth1_precision, caseB_m1_eth2_precision,caseA_m2_eth1_precision, caseA_m2_eth2_precision, caseB_m2_eth1_precision, caseB_m2_eth2_precision )
+recall_espec <- c(caseA_m1_eth1_recall, caseA_m1_eth2_recall, caseB_m1_eth1_recall, caseB_m1_eth2_recall,caseA_m2_eth1_recall, caseA_m2_eth2_recall, caseB_m2_eth1_recall, caseB_m2_eth2_recall)
+F1_meas_espec <- c(caseA_m1_eth1_f1meas, caseA_m1_eth2_f1meas, caseB_m1_eth1_f1meas, caseB_m1_eth2_f1meas,caseA_m2_eth1_f1meas, caseA_m2_eth2_f1meas, caseB_m2_eth1_f1meas, caseB_m2_eth2_f1meas)
+stats_table_espec <- data.frame(precision_espec,recall_espec,F1_meas_espec)
+rownames(stats_table_espec) = ethspecific_row_labels
+
+write.table(stats_table_espec, file="./Data/Output_Figures/EthnicitySpecific_SummaryStatistics.csv", sep=",", row.names=ethspecific_row_labels, col.names=c("Precision", "Recall", "F1-measure"))
+```
+
+
+Visualize!

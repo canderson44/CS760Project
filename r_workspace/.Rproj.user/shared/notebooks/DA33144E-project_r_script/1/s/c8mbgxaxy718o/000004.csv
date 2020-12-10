@@ -1,0 +1,2 @@
+"0","ethnicity_frequencies <- data.frame(table(numeric_data$Race...Ethnicity))"
+"0","ethnicity_frequencies"

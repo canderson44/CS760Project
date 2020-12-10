@@ -1,0 +1,32 @@
+{
+    "id": "4F5843BC",
+    "path": null,
+    "project_path": null,
+    "type": "r_dataframe",
+    "hash": "0",
+    "contents": "",
+    "dirty": false,
+    "created": 1607294162974.0,
+    "source_on_save": false,
+    "relative_order": 7,
+    "properties": {
+        "expression": "ethnicity_frequencies",
+        "caption": "ethnicity_frequencies",
+        "totalObservations": "12",
+        "displayedObservations": "12",
+        "variables": "2",
+        "cacheKey": "9FCB1AF1",
+        "object": "ethnicity_frequencies",
+        "environment": "",
+        "contentUrl": "grid_resource/gridviewer.html?env=&obj=ethnicity_frequencies&cache_key=9FCB1AF1&max_cols=50",
+        "preview": "0"
+    },
+    "folds": "",
+    "lastKnownWriteTime": 0,
+    "encoding": "",
+    "collab_server": "",
+    "source_window": "",
+    "last_content_update": 1607294162974,
+    "read_only": false,
+    "read_only_alternatives": []
+}
