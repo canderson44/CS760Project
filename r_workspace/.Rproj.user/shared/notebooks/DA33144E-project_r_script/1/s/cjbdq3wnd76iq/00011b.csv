@@ -1,1 +1,0 @@
-"0","caseB_comparison <- barplot(height=as.numeric(F1_meas[3:4]), names=row_labels[3:4],ylab=""F1 Measure"", ylim=c(0,1), col=""#69b3a2"")"

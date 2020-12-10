@@ -359,29 +359,29 @@ Now let's visualize the F scores!
 ```{r}
 #library(ggplot2)
 png("./Data/Output_Figures/caseA_comparison.png")
-caseA_comparison <- barplot(height=as.numeric(F1_meas[1:2]), names=row_labels[1:2],ylab="F1 Measure", ylim=c(0,1), col="brown")
+caseA_comparison <- barplot(height=as.numeric(F1_meas[1:2]), names=row_labels[1:2],ylab="F1 Measure", ylim=c(0,1), col="brown",density=c(30,10) , angle=c(11,90))
 text(x = caseA_comparison, y = as.numeric(F1_meas[1:2]), label = as.numeric(F1_meas[1:2]), pos = 3, cex = 0.8, col = "black")
 #save figure
 
 dev.off()
 
 png("./Data/Output_Figures/caseB_comparison.png")
-caseB_comparison <- barplot(height=as.numeric(F1_meas[3:4]), names=row_labels[3:4],ylab="F1 Measure", ylim=c(0,1), col="#69b3a2")
+caseB_comparison <- barplot(height=as.numeric(F1_meas[3:4]), names=row_labels[3:4],ylab="F1 Measure", ylim=c(0,1), col="#69b3a2",density=c(30,10) , angle=c(11,90))
 text(x = caseB_comparison, y = as.numeric(F1_meas[3:4]), label = as.numeric(F1_meas[3:4]), pos = 3, cex = 0.8, col = "black")
 dev.off()
 
 png("./Data/Output_Figures/m1_comparison.png")
-m1_comparison <-barplot(height=as.numeric(c(F1_meas[1], F1_meas[3])), names=c(row_labels[1],row_labels[3]),ylab="F1 Measure", ylim=c(0,1), col=c("#69b3a2","brown"))
+m1_comparison <-barplot(height=as.numeric(c(F1_meas[1], F1_meas[3])), names=c(row_labels[1],row_labels[3]),ylab="F1 Measure", ylim=c(0,1), col=c("#69b3a2","brown"),density=c(30,30) , angle=c(11,11))
 text(x = m1_comparison, y = as.numeric(c(F1_meas[1], F1_meas[3])), label = as.numeric(c(F1_meas[1], F1_meas[3])), pos = 3, cex = 0.8, col = "black")
 dev.off()
 
 png("./Data/Output_Figures/m2_comparison.png")
-m2_comparison<-barplot(height=as.numeric(c(F1_meas[2], F1_meas[4])), names=c(row_labels[2],row_labels[4]),ylab="F1 Measure", ylim=c(0,1), col=c("#69b3a2","brown"))
+m2_comparison<-barplot(height=as.numeric(c(F1_meas[2], F1_meas[4])), names=c(row_labels[2],row_labels[4]),ylab="F1 Measure", ylim=c(0,1), col=c("#69b3a2","brown"),density=c(10,10) , angle=c(90,90))
 text(x = m2_comparison, y = as.numeric(c(F1_meas[2], F1_meas[4])), label = as.numeric(c(F1_meas[2], F1_meas[4])), pos = 3, cex = 0.8, col = "black")
 dev.off()
 
 png("./Data/Output_Figures/all_comparison.png")
-all_comparison<-barplot(height=as.numeric(F1_meas), names=row_labels,ylab="F1 Measure", ylim=c(0,1), col=c("#69b3a2","#69b3a2","brown","brown"))
+all_comparison<-barplot(height=as.numeric(F1_meas), names=row_labels,ylab="F1 Measure", ylim=c(0,1), col=c("#69b3a2","#69b3a2","brown","brown"),density=c(30,10,30,10) , angle=c(11,90,11,90))
 text(x = all_comparison, y = as.numeric(F1_meas), label = as.numeric(F1_meas), pos = 3, cex = 0.8, col = "black")
 dev.off()
 ```

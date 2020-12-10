@@ -1,0 +1,8 @@
+"0","ethspecific_row_labels <- c(""A_M1_E1"", ""A_M1_E2"", ""B_M1_E1"", ""B_M1_E2"",""A_M2_E1"", ""A_M2_E2"", ""B_M2_E1"", ""B_M2_E2"")"
+"0","precision_espec<- c(caseA_m1_eth1_precision, caseA_m1_eth2_precision, caseB_m1_eth1_precision, caseB_m1_eth2_precision,caseA_m2_eth1_precision, caseA_m2_eth2_precision, caseB_m2_eth1_precision, caseB_m2_eth2_precision )"
+"0","recall_espec <- c(caseA_m1_eth1_recall, caseA_m1_eth2_recall, caseB_m1_eth1_recall, caseB_m1_eth2_recall,caseA_m2_eth1_recall, caseA_m2_eth2_recall, caseB_m2_eth1_recall, caseB_m2_eth2_recall)"
+"0","F1_meas_espec <- c(caseA_m1_eth1_f1meas, caseA_m1_eth2_f1meas, caseB_m1_eth1_f1meas, caseB_m1_eth2_f1meas,caseA_m2_eth1_f1meas, caseA_m2_eth2_f1meas, caseB_m2_eth1_f1meas, caseB_m2_eth2_f1meas)"
+"0","stats_table_espec <- data.frame(precision_espec,recall_espec,F1_meas_espec)"
+"0","rownames(stats_table_espec) = ethspecific_row_labels"
+"0",""
+"0","write.table(stats_table_espec, file=""./Data/Output_Figures/EthnicitySpecific_SummaryStatistics.csv"", sep="","", row.names=ethspecific_row_labels, col.names=c(""Precision"", ""Recall"", ""F1-measure""))"

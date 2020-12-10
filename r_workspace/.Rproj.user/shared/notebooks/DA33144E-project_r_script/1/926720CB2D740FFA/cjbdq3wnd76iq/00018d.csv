@@ -1,0 +1,1 @@
+"0","all_comparison<-barplot(height=as.numeric(F1_meas), names=row_labels,ylab=""F1 Measure"", ylim=c(0,1), col=c(""#69b3a2"",""#69b3a2"",""brown"",""brown""),density=c(30,10,30,10) , angle=c(11,90,11,90))"

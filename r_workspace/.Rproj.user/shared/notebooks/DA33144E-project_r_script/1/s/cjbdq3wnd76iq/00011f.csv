@@ -1,1 +1,0 @@
-"0","m1_comparison <-barplot(height=as.numeric(c(F1_meas[1], F1_meas[3])), names=c(row_labels[1],row_labels[3]),ylab=""F1 Measure"", ylim=c(0,1), col=c(""#69b3a2"",""brown""))"
