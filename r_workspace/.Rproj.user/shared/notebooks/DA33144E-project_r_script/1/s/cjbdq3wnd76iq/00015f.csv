@@ -1,8 +1,0 @@
-"0","text(x = all_comparison, y = as.numeric(F1_meas), label = as.numeric(F1_meas), pos = 3, cex = 0.8, col = ""black"")"
-"0","dev.off()"
-"1","null device "
-"1","
-"
-"1","          1 "
-"1","
-"

@@ -3,9 +3,9 @@
     "path": "~/Documents/CS760/Project/r_workspace/project_r_script.Rmd",
     "project_path": "project_r_script.Rmd",
     "type": "r_markdown",
-    "hash": "0",
+    "hash": "2266691329",
     "contents": "",
-    "dirty": true,
+    "dirty": false,
     "created": 1607289766767.0,
     "source_on_save": false,
     "relative_order": 1,
@@ -16,11 +16,11 @@
         "scrollLine": "366"
     },
     "folds": "",
-    "lastKnownWriteTime": 1607568309,
+    "lastKnownWriteTime": 1607570221,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1607570166325,
+    "last_content_update": 1607570221296,
     "read_only": false,
     "read_only_alternatives": []
 }
